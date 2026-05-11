@@ -249,7 +249,20 @@ if STREAMLIT_AVAILABLE:
     [data-testid="stMetricValue"] { font-size: 28px !important; font-weight: 700 !important; color: #1a5f3c; }
     [data-testid="stMetric"] { background-color: #f8f9fa; border: 1px solid #e9ecef; border-radius: 10px; padding: 14px 18px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
     .stDataFrame { font-size: 14px !important; border-radius: 8px; }
-    label, .stNumberInput label { font-size: 15px !important; font-weight: 500 !important; }
+    
+    /* Make the 3 main inputs (Principal, Rate, Tenure) bigger and prominent */
+    div[data-testid="stNumberInput"] input {
+        font-size: 22px !important;
+        font-weight: 600 !important;
+        padding: 14px 18px !important;
+        height: 56px !important;
+    }
+    
+    label, .stNumberInput label {
+        font-size: 17px !important;
+        font-weight: 600 !important;
+    }
+    
     .main .block-container { max-width: 1100px !important; padding-top: 1rem; padding-left: 2rem; padding-right: 2rem; }
     h2, h3 { color: #1a5f3c; font-weight: 600; }
     </style>
