@@ -216,7 +216,7 @@ def show_yearly_schedule_with_expanders(schedule_df: pd.DataFrame):
         return
 
     schedule_df = schedule_df.copy()
-    schedule_df['Year'] = pd.to_datetime(schedule_df['Payment Date']).dt.year
+    schedule_df['Year'] = pd.to_datetime(schedule_df['Payment Date'], format='%d %b %Y').dt.year
 
     years = schedule_df['Year'].unique()
 
@@ -390,7 +390,7 @@ if not schedule_df.empty:
     st.subheader("Outstanding Loan Balance Over Years")
     
     schedule_df_temp = schedule_df.copy()
-    schedule_df_temp['Year'] = pd.to_datetime(schedule_df_temp['Payment Date']).dt.year
+    schedule_df_temp['Year'] = pd.to_datetime(schedule_df_temp['Payment Date'], format='%d %b %Y').dt.year
     
     yearly_balance = schedule_df_temp.groupby('Year')['Outstanding Principal (₹)'].last().reset_index()
     yearly_balance.columns = ['Year', 'Outstanding Balance']
