@@ -210,6 +210,29 @@ def make_display_schedule(df: pd.DataFrame) -> pd.DataFrame:
     return display_df
 
 
+def show_yearly_schedule_with_expanders(schedule_df: pd.DataFrame):
+    """Group schedule by year and show with expandable monthly details."""
+    if schedule_df.empty:
+        return
+
+    schedule_df = schedule_df.copy()
+    schedule_df['Year'] = pd.to_datetime(schedule_df['Payment Date']).dt.year
+
+    years = schedule_df['Year'].unique()
+
+    for year in years:
+        year_data = schedule_df[schedule_df['Year'] == year]
+
+        total_payment = year_data['Payment (₹)'].sum()
+        total_interest = year_data['Interest (₹)'].sum()
+        total_principal = year_data['Principal (₹)'].sum()
+        ending_balance = year_data['Outstanding Principal (₹)'].iloc[-1]
+
+        with st.expander(f"**Year {year}** | Payment: {format_inr(total_payment, compact=True)} | Interest: {format_inr(total_interest, compact=True)} | Ending Balance: {format_inr(ending_balance, compact=True)}"):
+            monthly_display = make_display_schedule(year_data.drop(columns=['Year']))
+            st.dataframe(monthly_display, use_container_width=True, hide_index=True)
+
+
 # ====================== STREAMLIT UI ======================
 
 if STREAMLIT_AVAILABLE:
@@ -310,21 +333,28 @@ schedule_df, _ = generate_schedule(
 
 st.divider()
 
-# ====================== ALWAYS VISIBLE: SCHEDULE + BAR CHART ======================
-st.subheader("Repayment Schedule & Interest vs Principal Chart")
+# ====================== YEARLY SCHEDULE + OUTSTANDING BALANCE CHART ======================
+st.subheader("Repayment Schedule (Click Year to Expand)")
 
 if not schedule_df.empty:
-    display_df = make_display_schedule(schedule_df)
-    
-    st.dataframe(display_df, use_container_width=True, hide_index=True, height=320)
+    show_yearly_schedule_with_expanders(schedule_df)
     
     csv_buffer = io.StringIO()
     schedule_df.to_csv(csv_buffer, index=False)
-    st.download_button("⬇️ Download Schedule (CSV)", csv_buffer.getvalue(), "schedule.csv", "text/csv")
+    st.download_button("⬇️ Download Full Monthly Schedule (CSV)", csv_buffer.getvalue(), "full_schedule.csv", "text/csv")
     
-    st.markdown("**Interest vs Principal Breakdown (First 12 Months)**")
-    chart_data = schedule_df.head(12)[["Month", "Interest (₹)", "Principal (₹)"]].set_index("Month")
-    st.bar_chart(chart_data, use_container_width=True)
-    st.caption("Red = Interest component | Green = Principal component")
+    st.divider()
+    
+    st.subheader("Outstanding Loan Balance Over Years")
+    
+    schedule_df_temp = schedule_df.copy()
+    schedule_df_temp['Year'] = pd.to_datetime(schedule_df_temp['Payment Date']).dt.year
+    
+    yearly_balance = schedule_df_temp.groupby('Year')['Outstanding Principal (₹)'].last().reset_index()
+    yearly_balance.columns = ['Year', 'Outstanding Balance']
+    yearly_balance = yearly_balance.set_index('Year')
+    
+    st.line_chart(yearly_balance, use_container_width=True)
+    st.caption("This chart shows how your outstanding principal balance reduces every year.")
 else:
     st.warning("Could not generate schedule. Please check your inputs.")
