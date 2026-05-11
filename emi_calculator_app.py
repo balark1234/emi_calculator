@@ -90,9 +90,6 @@ def generate_schedule(
     """
     Core simulation engine.
     Returns (schedule_df, summary)
-    loan_type: "normal" or "interest_only"
-    extras: list of dicts [{"month": 5, "amount": 25000}, ...]
-    strategy: "reduce_tenure" (default, recommended) or "keep_tenure"
     """
     if extras is None:
         extras = []
@@ -101,12 +98,11 @@ def generate_schedule(
 
     monthly_rate = annual_rate / 12 / 100.0
 
-    # Calculate base EMI if not provided (for normal loans)
     if monthly_emi is None:
         if loan_type == "normal":
             monthly_emi = calculate_emi(principal, annual_rate, tenure_months)
         else:
-            monthly_emi = round(principal * monthly_rate, 2)  # initial interest only
+            monthly_emi = round(principal * monthly_rate, 2)
 
     extra_map = {}
     for e in extras:
@@ -120,7 +116,7 @@ def generate_schedule(
     total_amount_paid = 0.0
     current_payment = monthly_emi
 
-    max_months = tenure_months + 120  # safety
+    max_months = tenure_months + 120
     actual_tenure = tenure_months
 
     for month_num in range(1, max_months + 1):
@@ -132,7 +128,6 @@ def generate_schedule(
         extra_this_month = extra_map.get(month_num, 0.0)
 
         if loan_type == "normal":
-            # Normal reducing EMI
             payment = current_payment
             if outstanding + interest < payment + 1:
                 payment = outstanding + interest
@@ -145,13 +140,10 @@ def generate_schedule(
                 payment = interest_component + principal_component
 
         else:
-            # Interest Only (OD/Gold)
             interest_component = interest
-            # Regular payment = interest. Extra reduces principal.
             principal_component = extra_this_month
             payment = interest_component + principal_component
 
-            # On last original month or when loan is closing, add bullet principal
             is_final_month = (month_num == tenure_months)
             remaining_after_extra = outstanding - principal_component
             if is_final_month or remaining_after_extra <= 0.01:
@@ -159,7 +151,6 @@ def generate_schedule(
                 principal_component += bullet
                 payment += bullet
 
-        # Apply payment
         outstanding = max(0.0, outstanding - principal_component)
         total_interest_paid += interest_component
         total_amount_paid += payment
@@ -183,10 +174,8 @@ def generate_schedule(
 
     df = pd.DataFrame(schedule)
 
-    # Summary
     original_total_interest = 0.0
     if loan_type == "normal" and monthly_emi:
-        # Rough original interest estimate
         original_total_interest = (monthly_emi * tenure_months) - principal
     else:
         original_total_interest = principal * monthly_rate * tenure_months
@@ -221,47 +210,6 @@ def make_display_schedule(df: pd.DataFrame) -> pd.DataFrame:
     return display_df
 
 
-def get_remaining_balance(schedule_df: pd.DataFrame, after_month: int) -> dict:
-    """Get remaining principal and interest paid after a specific month."""
-    if schedule_df.empty or after_month < 1:
-        return {"error": "Invalid month"}
-
-    row = schedule_df[schedule_df["Month"] == after_month]
-    if row.empty:
-        # Find closest
-        row = schedule_df[schedule_df["Month"] <= after_month].tail(1)
-
-    if row.empty:
-        return {"error": "Month not found in schedule"}
-
-    r = row.iloc[0]
-    return {
-        "after_month": int(r["Month"]),
-        "outstanding_principal": r["Outstanding Principal (₹)"],
-        "cumulative_interest_paid": r["Cumulative Interest (₹)"],
-        "total_paid_till_then": schedule_df[schedule_df["Month"] <= after_month]["Payment (₹)"].sum()
-    }
-
-
-def generate_recurring_extras(frequency: str, extra_amount: float, start_month: int, max_month: int) -> list:
-    """Generate list of extra payment dicts based on frequency."""
-    extras = []
-    if extra_amount <= 0 or start_month < 1:
-        return extras
-
-    step = 1
-    if frequency == "Every 3 Months":
-        step = 3
-    elif frequency == "Every 6 Months":
-        step = 6
-    elif frequency == "Every 12 Months":
-        step = 12
-
-    for m in range(start_month, max_month + 1, step):
-        extras.append({"month": m, "amount": extra_amount})
-    return extras
-
-
 # ====================== STREAMLIT UI ======================
 
 if STREAMLIT_AVAILABLE:
@@ -272,7 +220,6 @@ if STREAMLIT_AVAILABLE:
         initial_sidebar_state="expanded"
     )
 
-    # Custom CSS
     st.markdown("""
     <style>
     [data-testid="stSidebar"] { display: none; }
@@ -292,6 +239,7 @@ st.markdown("**Normal Loans** (Principal + Interest)  •  **OD / Gold Loans** (
 st.subheader("Loan Details")
 
 col1, col2, col3 = st.columns(3)
+
 with col1:
     loan_type = st.radio("Loan Type", ["Normal Reducing EMI", "Interest-Only (OD/Gold)"], index=0, horizontal=True)
     loan_type_key = "normal" if "Normal" in loan_type else "interest_only"
@@ -329,9 +277,10 @@ with col3:
 st.divider()
 
 # ====================== EXTRA PAYMENTS (Reactive - No Add Button) ======================
-st.subheader("Extra Payments (Type amount → Schedule updates automatically)")
+st.subheader("Extra Payments (Type & See Changes Instantly)")
 
 col_e1, col_e2 = st.columns(2)
+
 with col_e1:
     st.markdown("**Adhoc Prepayment**")
     adhoc_amount = st.number_input("One-time Extra Amount (₹)", min_value=0, value=0, step=10000, help="Applied from next EMI")
@@ -340,19 +289,22 @@ with col_e2:
     rec_amount = st.number_input("Extra Amount per time (₹)", min_value=0, value=0, step=1000)
     freq = st.selectbox("Frequency", ["Every Month", "Every 3 Months", "Every 6 Months", "Every 12 Months"])
 
-# Build extras list reactively
 extras_list = []
 if adhoc_amount > 0:
     extras_list.append({"month": 1, "amount": adhoc_amount})
 if rec_amount > 0:
-    step = {"Every Month":1, "Every 3 Months":3, "Every 6 Months":6, "Every 12 Months":12}[freq]
-    for m in range(1, tenure_months+1, step):
+    step_map = {"Every Month": 1, "Every 3 Months": 3, "Every 6 Months": 6, "Every 12 Months": 12}
+    step = step_map.get(freq, 1)
+    for m in range(1, tenure_months + 1, step):
         extras_list.append({"month": m, "amount": rec_amount})
 
-# Generate schedule reactively
- schedule_df, _ = generate_schedule(
-    principal=principal, annual_rate=annual_rate, tenure_months=tenure_months,
-    loan_type=loan_type_key, monthly_emi=base_monthly, extras=extras_list,
+schedule_df, _ = generate_schedule(
+    principal=principal,
+    annual_rate=annual_rate,
+    tenure_months=tenure_months,
+    loan_type=loan_type_key,
+    monthly_emi=base_monthly,
+    extras=extras_list,
     start_date=datetime.combine(start_date, datetime.min.time())
 )
 
@@ -363,6 +315,7 @@ st.subheader("Repayment Schedule & Interest vs Principal Chart")
 
 if not schedule_df.empty:
     display_df = make_display_schedule(schedule_df)
+    
     st.dataframe(display_df, use_container_width=True, hide_index=True, height=320)
     
     csv_buffer = io.StringIO()
@@ -374,4 +327,4 @@ if not schedule_df.empty:
     st.bar_chart(chart_data, use_container_width=True)
     st.caption("Red = Interest component | Green = Principal component")
 else:
-    st.warning("Could not generate schedule. Please check inputs.")
+    st.warning("Could not generate schedule. Please check your inputs.")
