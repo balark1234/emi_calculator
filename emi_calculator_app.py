@@ -272,50 +272,75 @@ if STREAMLIT_AVAILABLE:
         initial_sidebar_state="expanded"
     )
 
-    # Custom CSS: bigger sidebar, larger numbers, more vertical/clean layout
+    # Custom CSS - Inspired by emicalculator.net clean vertical finance calculator look
     st.markdown("""
     <style>
-    /* Make left sidebar (panel) bigger */
+    /* Hide sidebar for cleaner web-like experience (inputs moved to main area) */
     [data-testid="stSidebar"] {
-        width: 420px !important;
-        min-width: 380px !important;
+        display: none;
     }
     
-    /* Larger numbers in metric cards */
+    /* Larger, prominent metric values - green finance theme */
     [data-testid="stMetricValue"] {
-        font-size: 26px !important;
-        font-weight: 600 !important;
+        font-size: 28px !important;
+        font-weight: 700 !important;
+        color: #1a5f3c;
     }
     [data-testid="stMetricLabel"] {
         font-size: 14px !important;
+        font-weight: 500 !important;
     }
     
-    /* Bigger readable text in tables */
+    /* Make metric cards look like nice cards */
+    [data-testid="stMetric"] {
+        background-color: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 10px;
+        padding: 14px 18px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+    }
+    
+    /* Better table readability */
     .stDataFrame {
-        font-size: 14.5px !important;
+        font-size: 14px !important;
+        border-radius: 8px;
     }
     
-    /* Slightly larger input labels */
-    label, .stNumberInput label, .stSlider label, .stSelectbox label {
+    /* Input labels - slightly larger and clear */
+    label, .stNumberInput label, .stSlider label, .stSelectbox label, .stRadio label {
         font-size: 15px !important;
+        font-weight: 500 !important;
     }
     
-    /* Constrain main content width for less horizontal stretch, more vertical friendly */
+    /* Overall container - clean vertical feel like emicalculator.net */
     .main .block-container {
-        max-width: 1080px !important;
-        padding-left: 1.5rem !important;
-        padding-right: 1.5rem !important;
+        max-width: 1100px !important;
+        padding-top: 1rem;
+        padding-left: 2rem;
+        padding-right: 2rem;
     }
     
-    /* Better vertical spacing in tabs */
+    /* Section headings - green finance color */
+    h2, h3 {
+        color: #1a5f3c;
+        font-weight: 600;
+    }
+    
+    /* Better spacing */
     .stTabs [data-baseweb="tab-panel"] {
-        padding-top: 0.75rem;
+        padding-top: 1rem;
+    }
+    
+    /* Nicer buttons */
+    .stButton button {
+        border-radius: 8px;
+        font-weight: 500;
     }
     </style>
     """, unsafe_allow_html=True)
 
-st.title("💰 Advanced EMI Calculator")
-st.markdown("**Normal Reducing EMI Loans** vs **Interest-Only OD/Gold Loans** with Adhoc & Recurring Extra Payments")
+st.title("💰 EMI Calculator")
+st.markdown("**Normal Loans** (Principal + Interest)  •  **OD / Gold Loans** (Interest Only)")
 
 # Initialize session state
 if "extras" not in st.session_state:
@@ -331,30 +356,40 @@ if "original_summary" not in st.session_state:
 if "with_extras_summary" not in st.session_state:
     st.session_state.with_extras_summary = {}
 
-# ====================== SIDEBAR INPUTS ======================
-with st.sidebar:
-    st.header("Loan Inputs")
+# ====================== TOP INPUT SECTION (Inspired by emicalculator.net) ======================
+st.subheader("Loan Details")
 
+col1, col2, col3 = st.columns(3)
+
+with col1:
     loan_type = st.radio(
         "Loan Type",
-        options=["Normal Reducing EMI (Principal + Interest)", "Interest-Only (OD / Gold Loan)"],
+        options=["Normal Reducing EMI", "Interest-Only (OD/Gold)"],
         index=0,
-        help="Normal = Standard EMI with P+I | Interest-Only = Pay only interest monthly, principal as bullet at end or via prepayments"
+        horizontal=True,
+        help="Normal = EMI includes Principal + Interest | Interest-Only = Pay only interest every month + Principal at end or via prepayment"
     )
     loan_type_key = "normal" if "Normal" in loan_type else "interest_only"
 
+with col2:
     principal = st.number_input("Principal Amount (₹)", min_value=10000, max_value=100000000, value=1000000, step=10000, format="%d")
 
-    annual_rate = st.slider("Annual Interest Rate (%)", min_value=1.0, max_value=36.0, value=10.5, step=0.1)
-    annual_rate = st.number_input("Annual Interest Rate (fine tune)", min_value=1.0, max_value=36.0, value=annual_rate, step=0.01)
+with col3:
+    annual_rate = st.number_input("Interest Rate (%)", min_value=1.0, max_value=36.0, value=10.5, step=0.1)
 
-    tenure_months = st.slider("Tenure (Months)", min_value=3, max_value=360, value=60, step=1)
-    tenure_months = st.number_input("Tenure in Months (fine tune)", min_value=3, max_value=360, value=tenure_months, step=1)
+col4, col5, col6 = st.columns(3)
 
-    start_date = st.date_input("Loan Start Date", value=datetime.now().date())
+with col4:
+    tenure_months = st.number_input("Tenure (Months)", min_value=3, max_value=360, value=60, step=1)
 
-    st.divider()
-    st.caption("💡 Tip: Change any value above — calculations update automatically")
+with col5:
+    start_date = st.date_input("Start Date", value=datetime.now().date())
+
+with col6:
+    st.caption(" ")  # spacing
+    st.caption("Changes update results instantly")
+
+st.divider()
 
 # ====================== MAIN DASHBOARD ======================
 col1, col2, col3 = st.columns(3)
@@ -378,6 +413,9 @@ with col3:
     st.metric("Total Amount Payable", format_inr(principal + total_original_interest, compact=True))
 
 st.divider()
+
+# Prominent Results Section (like emicalculator.net)
+st.subheader("Your EMI & Total Payment")
 
 # ====================== TABS ======================
 tab_schedule, tab_extras, tab_remaining = st.tabs([
@@ -602,7 +640,7 @@ with tab_remaining:
 st.divider()
 st.markdown("""
 **How to use this tool:**
-1. Set your loan details on the left sidebar (switch between Normal and Interest-Only).
+1. Set your loan details on the top section (switch between Normal and Interest-Only).
 2. View the full repayment schedule in the first tab.
 3. Add **Adhoc** (one-time) or **Recurring** extra payments in the second tab.
 4. Click **"Calculate Impact of All Extra Payments"** to see how much interest & time you save.
