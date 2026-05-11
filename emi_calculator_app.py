@@ -482,28 +482,17 @@ with tab_extras:
 
     # --- ADHOC PREPAYMENT ---
     st.markdown("### 1. Adhoc / One-time Part Payment")
-    with st.expander("ℹ️ What is 'Month Number'? (Click to understand)", expanded=False):
-        st.info("""
-        **Month Number** = Which EMI payment you want to make the extra payment with.
-        
-        - **Month 1** = Your very first EMI
-        - **Month 6** = After 6 months of regular EMIs
-        - **Month 12** = After exactly 1 year
-        - **Month 24** = After 2 years, and so on.
-        
-        This lets you simulate "I will pay an extra lump sum after X months of regular payments".
-        """)
+    st.caption("This extra amount will be applied from the next EMI onward.")
 
-    col_a, col_b, col_c = st.columns([2, 2, 1])
-    with col_a:
-        adhoc_month = st.number_input("Month Number (1 = First EMI)", min_value=1, max_value=tenure_months + 60, value=12, step=1, key="adhoc_month")
+    col_b, col_c = st.columns([3, 1])
     with col_b:
-        adhoc_amount = st.number_input("Extra Amount (₹)", min_value=0, value=50000, step=5000, key="adhoc_amount")
+        adhoc_amount = st.number_input("Adhoc Prepayment Amount (₹)", min_value=0, value=50000, step=5000, key="adhoc_amount")
     with col_c:
         if st.button("➕ Add Adhoc Payment", type="primary"):
             if adhoc_amount > 0:
-                st.session_state.extras.append({"month": int(adhoc_month), "amount": float(adhoc_amount)})
-                st.success(f"Added ₹{adhoc_amount:,.0f} in Month {adhoc_month}")
+                # Apply from the beginning / next EMI (month 1)
+                st.session_state.extras.append({"month": 1, "amount": float(adhoc_amount)})
+                st.success(f"Added ₹{adhoc_amount:,.0f} as adhoc prepayment")
                 st.rerun()
 
     st.divider()
