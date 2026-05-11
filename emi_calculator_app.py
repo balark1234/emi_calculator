@@ -261,23 +261,49 @@ st.markdown("**Normal Loans** (Principal + Interest)  •  **OD / Gold Loans** (
 # ====================== TOP INPUTS ======================
 st.subheader("Loan Details")
 
-col1, col2, col3 = st.columns(3)
+loan_type = st.radio(
+    "Loan Type",
+    ["Normal Reducing EMI", "Interest-Only (OD/Gold)"],
+    index=0,
+    horizontal=True
+)
+loan_type_key = "normal" if "Normal" in loan_type else "interest_only"
 
-with col1:
-    loan_type = st.radio("Loan Type", ["Normal Reducing EMI", "Interest-Only (OD/Gold)"], index=0, horizontal=True)
-    loan_type_key = "normal" if "Normal" in loan_type else "interest_only"
-with col2:
-    principal = st.number_input("Principal Amount (₹)", min_value=10000, max_value=100000000, value=1000000, step=10000, format="%d")
-with col3:
-    annual_rate = st.number_input("Interest Rate (%)", min_value=1.0, max_value=36.0, value=10.5, step=0.1)
+st.markdown("---")
 
-col4, col5, col6 = st.columns(3)
-with col4:
-    tenure_months = st.number_input("Tenure (Months)", min_value=3, max_value=360, value=60, step=1)
-with col5:
-    start_date = st.date_input("Start Date", value=datetime.now().date())
-with col6:
-    st.caption("Changes update instantly")
+# Main inputs stacked vertically
+principal = st.number_input(
+    "Principal Amount (₹)", 
+    min_value=10000, 
+    max_value=100000000, 
+    value=1000000, 
+    step=10000, 
+    format="%d"
+)
+
+annual_rate = st.number_input(
+    "Interest Rate (%)", 
+    min_value=1.0, 
+    max_value=36.0, 
+    value=10.5, 
+    step=0.1
+)
+
+tenure_months = st.number_input(
+    "Tenure (Months)", 
+    min_value=3, 
+    max_value=360, 
+    value=60, 
+    step=1
+)
+
+# Start Date moved to bottom as optional
+with st.expander("Advanced Options (Optional)"):
+    start_date = st.date_input(
+        "Start Date (for schedule display)", 
+        value=datetime.now().date(),
+        help="This only affects the dates shown in the schedule. It does not impact calculations."
+    )
 
 st.divider()
 
