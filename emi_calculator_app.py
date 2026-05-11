@@ -211,24 +211,58 @@ def make_display_schedule(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def show_yearly_schedule_with_expanders(schedule_df: pd.DataFrame):
-    """Group schedule by year and show with expandable monthly details."""
+    """Show yearly summary table + expandable monthly details per year."""
     if schedule_df.empty:
         return
 
+    # Add Year column
     schedule_df = schedule_df.copy()
     schedule_df['Year'] = pd.to_datetime(schedule_df['Payment Date'], format='%d %b %Y').dt.year
 
-    years = schedule_df['Year'].unique()
+    years = sorted(schedule_df['Year'].unique())
+
+    # ====================== YEARLY SUMMARY TABLE ======================
+    yearly_summary = []
+
+    for year in years:
+        year_data = schedule_df[schedule_df['Year'] == year]
+        
+        yearly_summary.append({
+            "Year": year,
+            "Total Payment (₹)": year_data['Payment (₹)'].sum(),
+            "Total Interest (₹)": year_data['Interest (₹)'].sum(),
+            "Total Principal (₹)": year_data['Principal (₹)'].sum(),
+            "Ending Outstanding (₹)": year_data['Outstanding Principal (₹)'].iloc[-1],
+            "No. of Months": len(year_data)
+        })
+
+    yearly_df = pd.DataFrame(yearly_summary)
+
+    # Format for display
+    display_yearly = yearly_df.copy()
+    for col in ["Total Payment (₹)", "Total Interest (₹)", "Total Principal (₹)", "Ending Outstanding (₹)"]:
+        display_yearly[col] = display_yearly[col].apply(lambda x: format_inr(x, compact=True))
+
+    st.markdown("**Yearly Summary**")
+    st.dataframe(display_yearly, use_container_width=True, hide_index=True)
+
+    st.divider()
+
+    # ====================== EXPANDABLE MONTHLY DETAILS ======================
+    st.markdown("**Click on any year below to view monthly breakdown**")
 
     for year in years:
         year_data = schedule_df[schedule_df['Year'] == year]
 
         total_payment = year_data['Payment (₹)'].sum()
         total_interest = year_data['Interest (₹)'].sum()
-        total_principal = year_data['Principal (₹)'].sum()
         ending_balance = year_data['Outstanding Principal (₹)'].iloc[-1]
 
-        with st.expander(f"**Year {year}** | Payment: {format_inr(total_payment, compact=True)} | Interest: {format_inr(total_interest, compact=True)} | Ending Balance: {format_inr(ending_balance, compact=True)}"):
+        with st.expander(
+            f"**Year {year}** — Payment: {format_inr(total_payment, compact=True)} | "
+            f"Interest: {format_inr(total_interest, compact=True)} | "
+            f"Ending Balance: {format_inr(ending_balance, compact=True)}"
+        ):
             monthly_display = make_display_schedule(year_data.drop(columns=['Year']))
             st.dataframe(monthly_display, use_container_width=True, hide_index=True)
 
