@@ -284,31 +284,34 @@ loan_type_key = "normal" if "Normal" in loan_type else "interest_only"
 
 st.markdown("---")
 
-# Main inputs stacked vertically
-principal = st.number_input(
-    "Principal Amount (₹)", 
-    min_value=10000, 
-    max_value=100000000, 
-    value=1000000, 
-    step=10000, 
-    format="%d"
-)
+# Center the three main inputs nicely (not stretching full width)
+col_left, col_center, col_right = st.columns([1, 2.8, 1])
 
-annual_rate = st.number_input(
-    "Interest Rate (%)", 
-    min_value=1.0, 
-    max_value=36.0, 
-    value=10.5, 
-    step=0.1
-)
+with col_center:
+    principal = st.number_input(
+        "Principal Amount (₹)", 
+        min_value=10000, 
+        max_value=100000000, 
+        value=1000000, 
+        step=10000, 
+        format="%d"
+    )
 
-tenure_months = st.number_input(
-    "Tenure (Months)", 
-    min_value=3, 
-    max_value=360, 
-    value=60, 
-    step=1
-)
+    annual_rate = st.number_input(
+        "Interest Rate (%)", 
+        min_value=1.0, 
+        max_value=36.0, 
+        value=10.5, 
+        step=0.1
+    )
+
+    tenure_months = st.number_input(
+        "Tenure (Months)", 
+        min_value=3, 
+        max_value=360, 
+        value=60, 
+        step=1
+    )
 
 # Start Date moved to bottom as optional
 with st.expander("Advanced Options (Optional)"):
