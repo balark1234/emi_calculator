@@ -272,129 +272,45 @@ if STREAMLIT_AVAILABLE:
         initial_sidebar_state="expanded"
     )
 
-    # Custom CSS - Inspired by emicalculator.net clean vertical finance calculator look
+    # Custom CSS
     st.markdown("""
     <style>
-    /* Hide sidebar for cleaner web-like experience (inputs moved to main area) */
-    [data-testid="stSidebar"] {
-        display: none;
-    }
-    
-    /* Larger, prominent metric values - green finance theme */
-    [data-testid="stMetricValue"] {
-        font-size: 28px !important;
-        font-weight: 700 !important;
-        color: #1a5f3c;
-    }
-    [data-testid="stMetricLabel"] {
-        font-size: 14px !important;
-        font-weight: 500 !important;
-    }
-    
-    /* Make metric cards look like nice cards */
-    [data-testid="stMetric"] {
-        background-color: #f8f9fa;
-        border: 1px solid #e9ecef;
-        border-radius: 10px;
-        padding: 14px 18px;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.06);
-    }
-    
-    /* Better table readability */
-    .stDataFrame {
-        font-size: 14px !important;
-        border-radius: 8px;
-    }
-    
-    /* Input labels - slightly larger and clear */
-    label, .stNumberInput label, .stSlider label, .stSelectbox label, .stRadio label {
-        font-size: 15px !important;
-        font-weight: 500 !important;
-    }
-    
-    /* Overall container - clean vertical feel like emicalculator.net */
-    .main .block-container {
-        max-width: 1100px !important;
-        padding-top: 1rem;
-        padding-left: 2rem;
-        padding-right: 2rem;
-    }
-    
-    /* Section headings - green finance color */
-    h2, h3 {
-        color: #1a5f3c;
-        font-weight: 600;
-    }
-    
-    /* Better spacing */
-    .stTabs [data-baseweb="tab-panel"] {
-        padding-top: 1rem;
-    }
-    
-    /* Nicer buttons */
-    .stButton button {
-        border-radius: 8px;
-        font-weight: 500;
-    }
+    [data-testid="stSidebar"] { display: none; }
+    [data-testid="stMetricValue"] { font-size: 28px !important; font-weight: 700 !important; color: #1a5f3c; }
+    [data-testid="stMetric"] { background-color: #f8f9fa; border: 1px solid #e9ecef; border-radius: 10px; padding: 14px 18px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
+    .stDataFrame { font-size: 14px !important; border-radius: 8px; }
+    label, .stNumberInput label { font-size: 15px !important; font-weight: 500 !important; }
+    .main .block-container { max-width: 1100px !important; padding-top: 1rem; padding-left: 2rem; padding-right: 2rem; }
+    h2, h3 { color: #1a5f3c; font-weight: 600; }
     </style>
     """, unsafe_allow_html=True)
 
 st.title("💰 EMI Calculator")
 st.markdown("**Normal Loans** (Principal + Interest)  •  **OD / Gold Loans** (Interest Only)")
 
-# Initialize session state
-if "extras" not in st.session_state:
-    st.session_state.extras = []
-if "last_params" not in st.session_state:
-    st.session_state.last_params = {}
-if "original_schedule" not in st.session_state:
-    st.session_state.original_schedule = pd.DataFrame()
-if "with_extras_schedule" not in st.session_state:
-    st.session_state.with_extras_schedule = pd.DataFrame()
-if "original_summary" not in st.session_state:
-    st.session_state.original_summary = {}
-if "with_extras_summary" not in st.session_state:
-    st.session_state.with_extras_summary = {}
-
-# ====================== TOP INPUT SECTION (Inspired by emicalculator.net) ======================
+# ====================== TOP INPUTS ======================
 st.subheader("Loan Details")
 
 col1, col2, col3 = st.columns(3)
-
 with col1:
-    loan_type = st.radio(
-        "Loan Type",
-        options=["Normal Reducing EMI", "Interest-Only (OD/Gold)"],
-        index=0,
-        horizontal=True,
-        help="Normal = EMI includes Principal + Interest | Interest-Only = Pay only interest every month + Principal at end or via prepayment"
-    )
+    loan_type = st.radio("Loan Type", ["Normal Reducing EMI", "Interest-Only (OD/Gold)"], index=0, horizontal=True)
     loan_type_key = "normal" if "Normal" in loan_type else "interest_only"
-
 with col2:
     principal = st.number_input("Principal Amount (₹)", min_value=10000, max_value=100000000, value=1000000, step=10000, format="%d")
-
 with col3:
     annual_rate = st.number_input("Interest Rate (%)", min_value=1.0, max_value=36.0, value=10.5, step=0.1)
 
 col4, col5, col6 = st.columns(3)
-
 with col4:
     tenure_months = st.number_input("Tenure (Months)", min_value=3, max_value=360, value=60, step=1)
-
 with col5:
     start_date = st.date_input("Start Date", value=datetime.now().date())
-
 with col6:
-    st.caption(" ")  # spacing
-    st.caption("Changes update results instantly")
+    st.caption("Changes update instantly")
 
 st.divider()
 
-# ====================== MAIN DASHBOARD ======================
-col1, col2, col3 = st.columns(3)
-
-# Calculate base values
+# ====================== RESULTS ======================
 if loan_type_key == "normal":
     base_monthly = calculate_emi(principal, annual_rate, tenure_months)
 else:
@@ -402,240 +318,60 @@ else:
 
 total_original_interest = (base_monthly * tenure_months) - principal if loan_type_key == "normal" else (principal * (annual_rate / 12 / 100) * tenure_months)
 
+col1, col2, col3 = st.columns(3)
 with col1:
-    st.metric("Monthly Payment", format_inr(base_monthly, compact=True), 
-              help="Normal EMI or Interest-only amount (initial)")
-
+    st.metric("Monthly Payment", format_inr(base_monthly, compact=True))
 with col2:
-    st.metric("Total Interest (Original)", format_inr(total_original_interest, compact=True))
-
+    st.metric("Total Interest", format_inr(total_original_interest, compact=True))
 with col3:
-    st.metric("Total Amount Payable", format_inr(principal + total_original_interest, compact=True))
+    st.metric("Total Payable", format_inr(principal + total_original_interest, compact=True))
 
 st.divider()
 
-# Prominent Results Section (like emicalculator.net)
-st.subheader("Your EMI & Total Payment")
+# ====================== EXTRA PAYMENTS (Reactive - No Add Button) ======================
+st.subheader("Extra Payments (Type amount → Schedule updates automatically)")
 
-# ====================== TABS ======================
-tab_schedule, tab_extras, tab_remaining = st.tabs([
-    "📊 Repayment Schedule", 
-    "🔄 Extra Payments & What-If", 
-    "📍 Remaining Balance Checker"
-])
+col_e1, col_e2 = st.columns(2)
+with col_e1:
+    st.markdown("**Adhoc Prepayment**")
+    adhoc_amount = st.number_input("One-time Extra Amount (₹)", min_value=0, value=0, step=10000, help="Applied from next EMI")
+with col_e2:
+    st.markdown("**Recurring Extra**")
+    rec_amount = st.number_input("Extra Amount per time (₹)", min_value=0, value=0, step=1000)
+    freq = st.selectbox("Frequency", ["Every Month", "Every 3 Months", "Every 6 Months", "Every 12 Months"])
 
-# Generate original schedule (no extras)
-original_df, original_summary = generate_schedule(
-    principal=principal,
-    annual_rate=annual_rate,
-    tenure_months=tenure_months,
-    loan_type=loan_type_key,
-    monthly_emi=base_monthly,
-    extras=[],
+# Build extras list reactively
+extras_list = []
+if adhoc_amount > 0:
+    extras_list.append({"month": 1, "amount": adhoc_amount})
+if rec_amount > 0:
+    step = {"Every Month":1, "Every 3 Months":3, "Every 6 Months":6, "Every 12 Months":12}[freq]
+    for m in range(1, tenure_months+1, step):
+        extras_list.append({"month": m, "amount": rec_amount})
+
+# Generate schedule reactively
+ schedule_df, _ = generate_schedule(
+    principal=principal, annual_rate=annual_rate, tenure_months=tenure_months,
+    loan_type=loan_type_key, monthly_emi=base_monthly, extras=extras_list,
     start_date=datetime.combine(start_date, datetime.min.time())
 )
 
-st.session_state.original_schedule = original_df
-st.session_state.original_summary = original_summary
-
-# ====================== TAB 1: SCHEDULE ======================
-with tab_schedule:
-    st.subheader("Original Repayment Schedule (No Extra Payments)")
-
-    if not original_df.empty:
-        display_df = make_display_schedule(original_df)
-        st.dataframe(
-            display_df,
-            use_container_width=True,
-            hide_index=True
-        )
-
-        # Download
-        csv_buffer = io.StringIO()
-        original_df.to_csv(csv_buffer, index=False)
-        st.download_button(
-            label="⬇️ Download Original Schedule as CSV",
-            data=csv_buffer.getvalue(),
-            file_name=f"original_schedule_{loan_type_key}.csv",
-            mime="text/csv"
-        )
-    else:
-        st.warning("Could not generate schedule. Please check inputs.")
-
-# ====================== TAB 2: EXTRA PAYMENTS ======================
-with tab_extras:
-    st.subheader("Extra Payments Simulator (Adhoc + Recurring)")
-
-    # Current extras display
-    if st.session_state.extras:
-        st.info(f"**Active Extra Payments:** {len(st.session_state.extras)} entries | Total extra amount: ₹ {sum(e['amount'] for e in st.session_state.extras):,.2f}")
-        with st.expander("View / Clear Current Extras"):
-            extras_df = pd.DataFrame(st.session_state.extras)
-            st.dataframe(extras_df, use_container_width=True, hide_index=True)
-            if st.button("🗑️ Clear All Extra Payments", type="secondary"):
-                st.session_state.extras = []
-                st.rerun()
-    else:
-        st.caption("No extra payments added yet. Use the sections below.")
-
-    st.divider()
-
-    # --- ADHOC PREPAYMENT ---
-    st.markdown("### 1. Adhoc / One-time Part Payment")
-    st.caption("This extra amount will be applied from the next EMI onward.")
-
-    col_b, col_c = st.columns([3, 1])
-    with col_b:
-        adhoc_amount = st.number_input("Adhoc Prepayment Amount (₹)", min_value=0, value=50000, step=5000, key="adhoc_amount")
-    with col_c:
-        if st.button("➕ Add Adhoc Payment", type="primary"):
-            if adhoc_amount > 0:
-                # Apply from the beginning / next EMI (month 1)
-                st.session_state.extras.append({"month": 1, "amount": float(adhoc_amount)})
-                st.success(f"Added ₹{adhoc_amount:,.0f} as adhoc prepayment")
-                st.rerun()
-
-    st.divider()
-
-    # --- RECURRING EXTRA PAYMENTS ---
-    st.markdown("### 2. Recurring Extra Payments (Flexible)")
-    col_r1, col_r2, col_r3, col_r4 = st.columns(4)
-    with col_r1:
-        freq = st.selectbox("Frequency", ["Every Month", "Every 3 Months", "Every 6 Months", "Every 12 Months"], key="freq")
-    with col_r2:
-        rec_amount = st.number_input("Extra Amount per instance (₹)", min_value=0, value=5000, step=1000, key="rec_amount")
-    with col_r3:
-        rec_start = st.number_input("Start from Month", min_value=1, max_value=tenure_months, value=6, step=1, key="rec_start")
-    with col_r4:
-        if st.button("➕ Add Recurring Extras", type="primary"):
-            if rec_amount > 0:
-                new_extras = generate_recurring_extras(freq, rec_amount, rec_start, tenure_months + 24)
-                st.session_state.extras.extend(new_extras)
-                st.success(f"Added {len(new_extras)} recurring extra payments of ₹{rec_amount:,.0f} ({freq})")
-                st.rerun()
-
-    st.divider()
-
-    # Strategy choice
-    st.markdown("### 3. Prepayment Strategy (for Normal Reducing Loans)")
-    strategy = st.radio(
-        "What should happen when you make extra payments?",
-        options=[
-            "Keep EMI same & reduce tenure (Recommended - Maximum interest saving)",
-            "Keep original tenure & reduce future EMI amount"
-        ],
-        index=0,
-        help="Option 1 saves the most interest. Option 2 keeps your monthly outflow same as original plan."
-    )
-    strategy_key = "reduce_tenure" if "reduce tenure" in strategy else "keep_tenure"
-
-    if loan_type_key == "interest_only":
-        st.caption("ℹ️ For Interest-Only loans, extra payments always reduce principal and future interest. No 'EMI' to reduce.")
-
-    # Compute with extras button
-    if st.button("🚀 Calculate Impact of All Extra Payments", type="primary", use_container_width=True):
-        if not st.session_state.extras:
-            st.warning("Please add at least one adhoc or recurring extra payment first.")
-        else:
-            # Generate schedule WITH extras
-            with_extras_df, with_extras_summary = generate_schedule(
-                principal=principal,
-                annual_rate=annual_rate,
-                tenure_months=tenure_months,
-                loan_type=loan_type_key,
-                monthly_emi=base_monthly,
-                extras=st.session_state.extras,
-                start_date=datetime.combine(start_date, datetime.min.time()),
-                strategy=strategy_key
-            )
-            st.session_state.with_extras_schedule = with_extras_df
-            st.session_state.with_extras_summary = with_extras_summary
-            st.success("Impact calculated! See results below.")
-
-    # Show comparison if available
-    if not st.session_state.with_extras_schedule.empty:
-        st.divider()
-        st.subheader("📈 Impact Summary")
-
-        s1 = st.session_state.original_summary
-        s2 = st.session_state.with_extras_summary
-
-        m1, m2, m3, m4 = st.columns(4)
-        with m1:
-            st.metric("Original Tenure", f"{s1['tenure_months']} months")
-        with m2:
-            st.metric("New Tenure (with extras)", f"{s2['actual_tenure_months']} months", 
-                      delta=f"-{s2['months_saved']} months" if s2['months_saved'] > 0 else None)
-        with m3:
-            st.metric("Original Total Interest", format_inr(s1['total_interest_paid'], compact=True))
-        with m4:
-            st.metric("New Total Interest", format_inr(s2['total_interest_paid'], compact=True),
-                      delta=f"-{format_inr(s2.get('interest_saved_vs_original', 0), compact=True)}" if s2.get('interest_saved_vs_original', 0) > 0 else None,
-                      delta_color="inverse")
-
-        st.caption(f"Strategy applied: **{s2.get('strategy_used', strategy_key)}**")
-
-        # Comparison - Vertical layout (less horizontal stretch, inspired by emicalculator.net)
-        st.subheader("Comparison: Original vs With Extra Payments")
-
-        st.markdown("**Original Schedule (No Extras)**")
-        display_orig = make_display_schedule(original_df.head(12))
-        st.dataframe(display_orig, use_container_width=True, hide_index=True)
-        if len(original_df) > 12:
-            st.caption(f"... showing first 12 of {len(original_df)} months")
-
-        st.markdown("**Updated Schedule After Extra Payments**")
-        display_new = make_display_schedule(st.session_state.with_extras_schedule.head(12))
-        st.dataframe(display_new, use_container_width=True, hide_index=True)
-        if len(st.session_state.with_extras_schedule) > 12:
-            st.caption(f"... showing first 12 of {len(st.session_state.with_extras_schedule)} months")
-
-        # Full download for with-extras
-        csv2 = io.StringIO()
-        st.session_state.with_extras_schedule.to_csv(csv2, index=False)
-        st.download_button(
-            "⬇️ Download Schedule with Extra Payments (CSV)",
-            data=csv2.getvalue(),
-            file_name=f"schedule_with_extras_{loan_type_key}.csv",
-            mime="text/csv"
-        )
-
-# ====================== TAB 3: REMAINING BALANCE ======================
-with tab_remaining:
-    st.subheader("Check Remaining Principal & Interest at Any Point")
-
-    if not original_df.empty:
-        max_m = int(original_df["Month"].max())
-        after_month = st.slider("After which month do you want to check?", 1, max_m, min(12, max_m), step=1)
-
-        remaining = get_remaining_balance(original_df, after_month)
-
-        if "error" not in remaining:
-            c1, c2, c3 = st.columns(3)
-            with c1:
-                st.metric("Outstanding Principal", format_inr(remaining['outstanding_principal'], compact=True))
-            with c2:
-                st.metric("Interest Paid Till Then", format_inr(remaining['cumulative_interest_paid'], compact=True))
-            with c3:
-                st.metric("Total Amount Paid Till Then", format_inr(remaining['total_paid_till_then'], compact=True))
-
-            st.caption("Note: This is based on the **original schedule** (no extras). If you have active extra payments, the outstanding will be lower.")
-        else:
-            st.error(remaining["error"])
-    else:
-        st.info("Generate the original schedule first by adjusting inputs on the left.")
-
-# ====================== FOOTER / INSTRUCTIONS ======================
 st.divider()
-st.markdown("""
-**How to use this tool:**
-1. Set your loan details on the top section (switch between Normal and Interest-Only).
-2. View the full repayment schedule in the first tab.
-3. Add **Adhoc** (one-time) or **Recurring** extra payments in the second tab.
-4. Click **"Calculate Impact of All Extra Payments"** to see how much interest & time you save.
-5. Use the third tab to check remaining principal after any month.
 
-**Tip for maximum savings:** Use the default strategy "Keep EMI same & reduce tenure".
-""")
+# ====================== ALWAYS VISIBLE: SCHEDULE + BAR CHART ======================
+st.subheader("Repayment Schedule & Interest vs Principal Chart")
 
-st.caption("Built for accurate what-if analysis on Normal EMI and Interest-Only (OD/Gold) loans • All calculations are simulated month-by-month")
+if not schedule_df.empty:
+    display_df = make_display_schedule(schedule_df)
+    st.dataframe(display_df, use_container_width=True, hide_index=True, height=320)
+    
+    csv_buffer = io.StringIO()
+    schedule_df.to_csv(csv_buffer, index=False)
+    st.download_button("⬇️ Download Schedule (CSV)", csv_buffer.getvalue(), "schedule.csv", "text/csv")
+    
+    st.markdown("**Interest vs Principal Breakdown (First 12 Months)**")
+    chart_data = schedule_df.head(12)[["Month", "Interest (₹)", "Principal (₹)"]].set_index("Month")
+    st.bar_chart(chart_data, use_container_width=True)
+    st.caption("Red = Interest component | Green = Principal component")
+else:
+    st.warning("Could not generate schedule. Please check inputs.")
