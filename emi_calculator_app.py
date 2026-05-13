@@ -141,29 +141,6 @@ def show_yearly_schedule_with_selection(schedule_df: pd.DataFrame):
 
     years = sorted(schedule_df['Year'].unique())
 
-    # ====================== YEARLY SUMMARY TABLE ======================
-    yearly_summary = []
-    for year in years:
-        year_data = schedule_df[schedule_df['Year'] == year]
-        yearly_summary.append({
-            "Year": int(year),
-            "Total Payment (₹)": year_data['Payment (₹)'].sum(),
-            "Total Interest (₹)": year_data['Interest (₹)'].sum(),
-            "Total Principal (₹)": year_data['Principal (₹)'].sum(),
-            "Ending Outstanding (₹)": year_data['Outstanding Principal (₹)'].iloc[-1],
-            "Months": len(year_data)
-        })
-
-    yearly_df = pd.DataFrame(yearly_summary)
-    display_yearly = yearly_df.copy()
-    for col in ["Total Payment (₹)", "Total Interest (₹)", "Total Principal (₹)", "Ending Outstanding (₹)"]:
-        display_yearly[col] = display_yearly[col].apply(lambda x: format_inr(x, compact=True))
-
-    st.markdown("**Yearly Repayment Summary**")
-    st.dataframe(display_yearly, use_container_width=True, hide_index=True)
-
-    st.divider()
-
     # ====================== EXPANDABLE YEARLY DETAILS ======================
     st.markdown("**Click on any year below to view monthly breakdown**")
 
