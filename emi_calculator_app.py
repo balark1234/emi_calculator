@@ -132,40 +132,55 @@ def make_display_schedule(df):
     return display_df
 
 
-def show_yearly_schedule_with_selection(schedule_df):
+def show_yearly_schedule_with_selection(schedule_df: pd.DataFrame):
     if schedule_df.empty:
         return
-    df = schedule_df.copy()
-    df['Year'] = pd.to_datetime(df['Payment Date'], format='%d %b %Y').dt.year
-    years = sorted(df['Year'].unique())
-    summary = []
-    for y in years:
-        yd = df[df['Year'] == y]
-        summary.append({
-            "Year": int(y),
-            "Total Payment (₹)": yd['Payment (₹)'].sum(),
-            "Total Interest (₹)": yd['Interest (₹)'].sum(),
-            "Total Principal (₹)": yd['Principal (₹)'].sum(),
-            "Ending Outstanding (₹)": yd['Outstanding Principal (₹)'].iloc[-1],
-            "Months": len(yd)
-        })
-    ydf = pd.DataFrame(summary)
-    disp = ydf.copy()
-    for c in ["Total Payment (₹)", "Total Interest (₹)", "Total Principal (₹)", "Ending Outstanding (₹)"]:
-        disp[c] = disp[c].apply(lambda x: format_inr(x, compact=True))
-    st.markdown("**Yearly Repayment Summary** — Click any row to see monthly details")
-    event = st.dataframe(disp, use_container_width=True, hide_index=True, selection_mode="single-row", on_select="rerun", key="yearly_table")
-    selected_year = None
-    if event.selection.rows:
-        selected_year = int(ydf.iloc[event.selection.rows[0]]["Year"])
-    if selected_year is not None:
-        st.divider()
-        st.markdown(f"**Monthly Details for Year {selected_year}**")
-        yd = df[df['Year'] == selected_year]
-        st.dataframe(make_display_schedule(yd.drop(columns=['Year'])), use_container_width=True, hide_index=True)
-    else:
-        st.caption("Click any year row above")
 
+    schedule_df = schedule_df.copy()
+    schedule_df['Year'] = pd.to_datetime(schedule_df['Payment Date'], format='%d %b %Y').dt.year
+
+    years = sorted(schedule_df['Year'].unique())
+
+    # ====================== YEARLY SUMMARY TABLE ======================
+    yearly_summary = []
+    for year in years:
+        year_data = schedule_df[schedule_df['Year'] == year]
+        yearly_summary.append({
+            "Year": int(year),
+            "Total Payment (₹)": year_data['Payment (₹)'].sum(),
+            "Total Interest (₹)": year_data['Interest (₹)'].sum(),
+            "Total Principal (₹)": year_data['Principal (₹)'].sum(),
+            "Ending Outstanding (₹)": year_data['Outstanding Principal (₹)'].iloc[-1],
+            "Months": len(year_data)
+        })
+
+    yearly_df = pd.DataFrame(yearly_summary)
+    display_yearly = yearly_df.copy()
+    for col in ["Total Payment (₹)", "Total Interest (₹)", "Total Principal (₹)", "Ending Outstanding (₹)"]:
+        display_yearly[col] = display_yearly[col].apply(lambda x: format_inr(x, compact=True))
+
+    st.markdown("**Yearly Repayment Summary**")
+    st.dataframe(display_yearly, use_container_width=True, hide_index=True)
+
+    st.divider()
+
+    # ====================== EXPANDABLE YEARLY DETAILS ======================
+    st.markdown("**Click on any year below to view monthly breakdown**")
+
+    for year in years:
+        year_data = schedule_df[schedule_df['Year'] == year]
+
+        total_payment = year_data['Payment (₹)'].sum()
+        total_interest = year_data['Interest (₹)'].sum()
+        ending_balance = year_data['Outstanding Principal (₹)'].iloc[-1]
+
+        with st.expander(
+            f"**Year {year}** — Payment: {format_inr(total_payment, compact=True)} | "
+            f"Interest: {format_inr(total_interest, compact=True)} | "
+            f"Ending Balance: {format_inr(ending_balance, compact=True)}"
+        ):
+            monthly_display = make_display_schedule(year_data.drop(columns=['Year']))
+            st.dataframe(monthly_display, use_container_width=True, hide_index=True)
 
 if STREAMLIT_AVAILABLE:
     st.set_page_config(page_title="EMI Calculator", layout="wide")
