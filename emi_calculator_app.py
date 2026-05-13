@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-EMI Calculator Web App - Streamlit
+EMI Calculator Web App - Streamlit (Corrected & Updated)
 Supports:
 1. Normal Reducing Balance EMI Loans (Principal + Interest)
 2. OD / Gold Loans - Interest Only (Bullet principal at end)
@@ -15,7 +15,7 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 import io
 
-# Try to import Streamlit (only needed when running the web app)
+# Try to import Streamlit
 try:
     import streamlit as st
     STREAMLIT_AVAILABLE = True
@@ -23,15 +23,18 @@ except ImportError:
     STREAMLIT_AVAILABLE = False
     st = None
 
+# ====================== PLOTLY IMPORT (FIXED) ======================
+try:
+    import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
+    PLOTLY_AVAILABLE = True
+except ImportError:
+    PLOTLY_AVAILABLE = False
+
 
 # ====================== INDIAN NUMBER FORMATTING ======================
 
 def format_inr(amount: float, compact: bool = False) -> str:
-    """
-    Format amount in Indian numbering system.
-    compact=True  → ₹12.50 Lakh or ₹1.25 Cr   (ideal for big metric cards)
-    compact=False → ₹12,50,000.00             (full Indian comma format for tables)
-    """
     if amount is None:
         return "₹ 0.00"
     n = float(amount)
@@ -39,18 +42,16 @@ def format_inr(amount: float, compact: bool = False) -> str:
     n = abs(n)
 
     if compact:
-        if n >= 10000000:      # 1 Crore+
+        if n >= 10000000:
             return f"{sign}{n/10000000:.2f} Cr"
-        elif n >= 100000:      # 1 Lakh+
+        elif n >= 100000:
             return f"{sign}{n/100000:.2f} Lakh"
         else:
             return f"{sign}{n:,.2f}"
     else:
-        # Full Indian comma format (1,00,00,000 style)
         s = f"{n:,.2f}"
         int_part, dec_part = s.split('.')
         int_part = int_part.replace(',', '')
-
         if len(int_part) <= 3:
             formatted = int_part
         else:
@@ -66,7 +67,6 @@ def format_inr(amount: float, compact: bool = False) -> str:
 # ====================== CORE CALCULATION FUNCTIONS ======================
 
 def calculate_emi(principal: float, annual_rate: float, tenure_months: int) -> float:
-    """Standard EMI formula for reducing balance loans."""
     if annual_rate <= 0:
         return round(principal / tenure_months, 2)
     monthly_rate = annual_rate / 12 / 100
@@ -87,10 +87,6 @@ def generate_schedule(
     start_date: datetime = None,
     strategy: str = "reduce_tenure"
 ) -> tuple[pd.DataFrame, dict]:
-    """
-    Core simulation engine.
-    Returns (schedule_df, summary)
-    """
     if extras is None:
         extras = []
     if start_date is None:
@@ -198,7 +194,6 @@ def generate_schedule(
 
 
 def make_display_schedule(df: pd.DataFrame) -> pd.DataFrame:
-    """Create a copy of schedule with Indian-formatted money columns for nice display."""
     if df.empty:
         return df
     display_df = df.copy()
@@ -210,54 +205,57 @@ def make_display_schedule(df: pd.DataFrame) -> pd.DataFrame:
     return display_df
 
 
-def show_yearly_schedule_with_selection(schedule_df):
-    """Single table with clickable rows. Monthly details appear below when a year is selected."""
+def show_yearly_schedule_with_selection(schedule_df: pd.DataFrame):
     if schedule_df.empty:
         return
 
-    df = schedule_df.copy()
-    df['Year'] = pd.to_datetime(df['Payment Date'], format='%d %b %Y').dt.year
-    years = sorted(df['Year'].unique())
+    schedule_df = schedule_df.copy()
+    schedule_df['Year'] = pd.to_datetime(schedule_df['Payment Date'], format='%d %b %Y').dt.year
 
-    summary = []
-    for y in years:
-        yd = df[df['Year'] == y]
-        summary.append({
-            "Year": int(y),
-            "Total Payment (₹)": yd['Payment (₹)'].sum(),
-            "Total Interest (₹)": yd['Interest (₹)'].sum(),
-            "Total Principal (₹)": yd['Principal (₹)'].sum(),
-            "Ending Outstanding (₹)": yd['Outstanding Principal (₹)'].iloc[-1],
-            "Months": len(yd)
+    years = sorted(schedule_df['Year'].unique())
+
+    yearly_summary = []
+    for year in years:
+        year_data = schedule_df[schedule_df['Year'] == year]
+        yearly_summary.append({
+            "Year": int(year),
+            "Total Payment (₹)": year_data['Payment (₹)'].sum(),
+            "Total Interest (₹)": year_data['Interest (₹)'].sum(),
+            "Total Principal (₹)": year_data['Principal (₹)'].sum(),
+            "Ending Outstanding (₹)": year_data['Outstanding Principal (₹)'].iloc[-1],
+            "Months": len(year_data)
         })
 
-    ydf = pd.DataFrame(summary)
-    disp = ydf.copy()
-    for c in ["Total Payment (₹)", "Total Interest (₹)", "Total Principal (₹)", "Ending Outstanding (₹)"]:
-        disp[c] = disp[c].apply(lambda x: format_inr(x, compact=True))
+    yearly_df = pd.DataFrame(yearly_summary)
+    display_yearly = yearly_df.copy()
+    for col in ["Total Payment (₹)", "Total Interest (₹)", "Total Principal (₹)", "Ending Outstanding (₹)"]:
+        display_yearly[col] = display_yearly[col].apply(lambda x: format_inr(x, compact=True))
 
-    st.markdown("**Yearly Summary** — Click any row to see monthly details")
+    st.markdown("**Yearly Repayment Summary** — Click any row to see monthly details")
 
     event = st.dataframe(
-        disp,
+        display_yearly,
         use_container_width=True,
         hide_index=True,
         selection_mode="single-row",
         on_select="rerun",
-        key="yearly_table"
+        key="yearly_schedule_table"
     )
 
     selected_year = None
     if event.selection.rows:
-        selected_year = int(ydf.iloc[event.selection.rows[0]]["Year"])
+        selected_idx = event.selection.rows[0]
+        selected_year = int(yearly_df.iloc[selected_idx]["Year"])
 
     if selected_year is not None:
         st.divider()
         st.markdown(f"**Monthly Details for Year {selected_year}**")
-        yd = df[df['Year'] == selected_year]
-        st.dataframe(make_display(yd.drop(columns=['Year'])), use_container_width=True, hide_index=True)
+        year_data = schedule_df[schedule_df['Year'] == selected_year]
+        monthly_display = make_display_schedule(year_data.drop(columns=['Year']))
+        st.dataframe(monthly_display, use_container_width=True, hide_index=True)
     else:
-        st.caption("Click any year row above to view its monthly breakdown")
+        st.caption("👆 Click any year row above to view its monthly breakdown")
+
 
 # ====================== STREAMLIT UI ======================
 
@@ -265,164 +263,117 @@ if STREAMLIT_AVAILABLE:
     st.set_page_config(
         page_title="EMI Calculator - Normal & OD/Gold Loans",
         page_icon="💰",
-        layout="wide",
-        initial_sidebar_state="expanded"
+        layout="wide"
     )
 
-    st.markdown("""
-    <style>
-    [data-testid="stSidebar"] { display: none; }
-    [data-testid="stMetricValue"] { font-size: 28px !important; font-weight: 700 !important; color: #1a5f3c; }
-    [data-testid="stMetric"] { background-color: #f8f9fa; border: 1px solid #e9ecef; border-radius: 10px; padding: 14px 18px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
-    .stDataFrame { font-size: 14px !important; border-radius: 8px; }
-    
-    /* Make the 3 main inputs (Principal, Rate, Tenure) bigger and prominent */
-    div[data-testid="stNumberInput"] input {
-        font-size: 22px !important;
-        font-weight: 600 !important;
-        padding: 14px 18px !important;
-        height: 56px !important;
-    }
-    
-    label, .stNumberInput label {
-        font-size: 17px !important;
-        font-weight: 600 !important;
-    }
-    
-    .main .block-container { max-width: 1100px !important; padding-top: 1rem; padding-left: 2rem; padding-right: 2rem; }
-    h2, h3 { color: #1a5f3c; font-weight: 600; }
-    </style>
-    """, unsafe_allow_html=True)
+    st.title("💰 EMI Calculator")
+    st.markdown("**Normal Reducing EMI** • **Interest-Only (OD/Gold)**")
 
-st.title("💰 EMI Calculator")
-st.markdown("**Normal Loans** (Principal + Interest)  •  **OD / Gold Loans** (Interest Only)")
+    loan_type = st.radio(
+        "Loan Type",
+        ["Normal Reducing EMI", "Interest-Only (OD/Gold)"],
+        index=0,
+        horizontal=True
+    )
+    loan_type_key = "normal" if "Normal" in loan_type else "interest_only"
 
-# ====================== TOP INPUTS ======================
-st.subheader("Loan Details")
+    st.subheader("Loan Details")
 
-loan_type = st.radio(
-    "Loan Type",
-    ["Normal Reducing EMI", "Interest-Only (OD/Gold)"],
-    index=0,
-    horizontal=True
-)
-loan_type_key = "normal" if "Normal" in loan_type else "interest_only"
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        principal = st.number_input("Principal Amount (₹)", 100000, 50000000, 2500000, 50000)
+    with col2:
+        annual_rate = st.number_input("Interest Rate (%)", 6.0, 18.0, 9.5, 0.1)
+    with col3:
+        tenure_months = st.number_input("Tenure (Months)", 12, 360, 240, 1)
 
-st.markdown("---")
+    base_monthly = calculate_emi(principal, annual_rate, tenure_months) if loan_type_key == "normal" else round(principal * (annual_rate / 12 / 100), 2)
 
-# Center the three main inputs nicely (not stretching full width)
-col_left, col_center, col_right = st.columns([1, 2.8, 1])
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Monthly Payment", format_inr(base_monthly, compact=True))
+    with col2:
+        total_int = (base_monthly * tenure_months) - principal if loan_type_key == "normal" else principal * (annual_rate / 12 / 100) * tenure_months
+        st.metric("Total Interest", format_inr(total_int, compact=True))
+    with col3:
+        st.metric("Total Payable", format_inr(principal + total_int, compact=True))
 
-with col_center:
-    principal = st.number_input(
-        "Principal Amount (₹)", 
-        min_value=10000, 
-        max_value=100000000, 
-        value=1000000, 
-        step=10000, 
-        format="%d"
+    st.divider()
+
+    extras_list = []
+
+    schedule_df, _ = generate_schedule(
+        principal=principal,
+        annual_rate=annual_rate,
+        tenure_months=tenure_months,
+        loan_type=loan_type_key,
+        monthly_emi=base_monthly,
+        extras=extras_list
     )
 
-    annual_rate = st.number_input(
-        "Interest Rate (%)", 
-        min_value=1.0, 
-        max_value=36.0, 
-        value=10.5, 
-        step=0.1
-    )
+    st.subheader("Repayment Schedule")
 
-    tenure_months = st.number_input(
-        "Tenure (Months)", 
-        min_value=3, 
-        max_value=360, 
-        value=60, 
-        step=1
-    )
+    if not schedule_df.empty:
+        show_yearly_schedule_with_selection(schedule_df)
 
-# Start Date moved to bottom as optional
-with st.expander("Advanced Options (Optional)"):
-    start_date = st.date_input(
-        "Start Date (for schedule display)", 
-        value=datetime.now().date(),
-        help="This only affects the dates shown in the schedule. It does not impact calculations."
-    )
+        csv_buffer = io.StringIO()
+        schedule_df.to_csv(csv_buffer, index=False)
+        st.download_button("⬇️ Download Full Monthly Schedule (CSV)", csv_buffer.getvalue(), "full_schedule.csv", "text/csv")
 
-st.divider()
+        st.divider()
 
-# ====================== RESULTS ======================
-if loan_type_key == "normal":
-    base_monthly = calculate_emi(principal, annual_rate, tenure_months)
-else:
-    base_monthly = round(principal * (annual_rate / 12 / 100), 2)
+        # ====================== OUTSTANDING BALANCE CHART ======================
+        st.subheader("Yearly Payment Breakdown & Outstanding Balance")
 
-total_original_interest = (base_monthly * tenure_months) - principal if loan_type_key == "normal" else (principal * (annual_rate / 12 / 100) * tenure_months)
+        if PLOTLY_AVAILABLE:
+            schedule_df_temp = schedule_df.copy()
+            schedule_df_temp['Year'] = pd.to_datetime(schedule_df_temp['Payment Date'], format='%d %b %Y').dt.year
 
-col1, col2, col3 = st.columns(3)
-with col1:
-    st.metric("Monthly Payment", format_inr(base_monthly, compact=True))
-with col2:
-    st.metric("Total Interest", format_inr(total_original_interest, compact=True))
-with col3:
-    st.metric("Total Payable", format_inr(principal + total_original_interest, compact=True))
+            yearly_data = schedule_df_temp.groupby('Year').agg({
+                'Principal (₹)': 'sum',
+                'Interest (₹)': 'sum',
+                'Outstanding Principal (₹)': 'last'
+            }).reset_index()
+            yearly_data.columns = ['Year', 'Principal', 'Interest', 'Balance']
 
-st.divider()
+            fig = make_subplots(specs=[[{{"secondary_y": True}}]])
 
-# ====================== EXTRA PAYMENTS (Reactive - No Add Button) ======================
-st.subheader("Extra Payments (Type & See Changes Instantly)")
+            fig.add_trace(
+                go.Bar(x=yearly_data['Year'], y=yearly_data['Principal'], name='Principal', marker_color='#27ae60'),
+                secondary_y=False
+            )
+            fig.add_trace(
+                go.Bar(x=yearly_data['Year'], y=yearly_data['Interest'], name='Interest', marker_color='#e67e22'),
+                secondary_y=False
+            )
+            fig.add_trace(
+                go.Scatter(
+                    x=yearly_data['Year'],
+                    y=yearly_data['Balance'],
+                    name='Outstanding Balance',
+                    mode='lines+markers',
+                    line=dict(color='#8e44ad', width=3),
+                    marker=dict(size=7)
+                ),
+                secondary_y=True
+            )
 
-col_e1, col_e2 = st.columns(2)
+            fig.update_layout(
+                barmode='stack',
+                height=480,
+                title_text="Yearly Principal + Interest (Stacked) + Outstanding Balance",
+                hovermode="x unified"
+            )
+            fig.update_layout(
+                xaxis=dict(fixedrange=True),
+                yaxis=dict(fixedrange=True),
+                yaxis2=dict(fixedrange=True)
+            )
 
-with col_e1:
-    st.markdown("**Adhoc Prepayment**")
-    adhoc_amount = st.number_input("One-time Extra Amount (₹)", min_value=0, value=0, step=10000, help="Applied from next EMI")
-with col_e2:
-    st.markdown("**Recurring Extra**")
-    rec_amount = st.number_input("Extra Amount per time (₹)", min_value=0, value=0, step=1000)
-    freq = st.selectbox("Frequency", ["Every Month", "Every 3 Months", "Every 6 Months", "Every 12 Months"])
-
-extras_list = []
-if adhoc_amount > 0:
-    extras_list.append({"month": 1, "amount": adhoc_amount})
-if rec_amount > 0:
-    step_map = {"Every Month": 1, "Every 3 Months": 3, "Every 6 Months": 6, "Every 12 Months": 12}
-    step = step_map.get(freq, 1)
-    for m in range(1, tenure_months + 1, step):
-        extras_list.append({"month": m, "amount": rec_amount})
-
-schedule_df, _ = generate_schedule(
-    principal=principal,
-    annual_rate=annual_rate,
-    tenure_months=tenure_months,
-    loan_type=loan_type_key,
-    monthly_emi=base_monthly,
-    extras=extras_list,
-    start_date=datetime.combine(start_date, datetime.min.time())
-)
-
-st.divider()
-
-# ====================== YEARLY CHART ======================
-st.subheader("Yearly Payment Breakdown & Outstanding Balance")
-
-if PLOTLY_AVAILABLE:
-    tmp = schedule_df.copy()
-    tmp['Year'] = pd.to_datetime(tmp['Payment Date'], format='%d %b %Y').dt.year
-    yg = tmp.groupby('Year').agg({
-        'Principal (₹)': 'sum',
-        'Interest (₹)': 'sum',
-        'Outstanding Principal (₹)': 'last'
-    }).reset_index()
-    yg.columns = ['Year', 'Principal', 'Interest', 'Balance']
-
-    fig = make_subplots(specs=[[{"secondary_y": True}]])
-    fig.add_trace(go.Bar(x=yg['Year'], y=yg['Principal'], name='Principal', marker_color='#27ae60'), secondary_y=False)
-    fig.add_trace(go.Bar(x=yg['Year'], y=yg['Interest'], name='Interest', marker_color='#e67e22'), secondary_y=False)
-    fig.add_trace(go.Scatter(x=yg['Year'], y=yg['Balance'], name='Outstanding Balance', mode='lines+markers',
-                             line=dict(color='#8e44ad', width=3), marker=dict(size=7)), secondary_y=True)
-
-    fig.update_layout(barmode='stack', height=480, title_text="Yearly Principal + Interest + Outstanding Balance")
-    fig.update_layout(xaxis=dict(fixedrange=True), yaxis=dict(fixedrange=True), yaxis2=dict(fixedrange=True))
-    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
-    st.caption("Green = Principal | Orange = Interest | Purple = Outstanding Balance")
-else:
-    st.warning("Please run: pip install plotly")
+            st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+            st.caption("Green = Principal | Orange = Interest | Purple Line = Outstanding Balance at year end")
+        else:
+            st.warning("Plotly not installed. Install it with: pip install plotly")
+            st.line_chart(schedule_df.set_index('Year')['Outstanding Principal (₹)'] if 'Year' in schedule_df.columns else pd.DataFrame())
+    else:
+        st.warning("Could not generate schedule. Please check your inputs.")
